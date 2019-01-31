@@ -93,3 +93,64 @@ func TestRealIP(t *testing.T) {
 		}
 	}
 }
+
+func TestClientIPFromRequest(t *testing.T) {
+	// Create type and function for testing
+	type testIP struct {
+		name     string
+		request  *http.Request
+		expected string
+	}
+
+	newRequest := func(remoteAddr string, xRealIP string, xForwardedFor string) *http.Request {
+		headerList := http.Header{}
+		headerList.Set("X-Real-IP", xRealIP)
+		headerList.Set("X-Forwarded-For", xForwardedFor)
+
+		return &http.Request{
+			RemoteAddr: remoteAddr,
+			Header:     headerList,
+		}
+	}
+
+	// Create test data
+	privateAddr := "127.0.0.1:1234"
+	publicAddr := "144.12.54.87"
+	multiAddresses := " 127.0.0.1 , 144.12.54.87:1234 , 119.14.55.11:1234 ,"
+
+	testData := []testIP{
+		{
+			name:     "Has remoteAddr",
+			request:  newRequest(publicAddr, "", privateAddr),
+			expected: publicAddr,
+		}, {
+			name:     "Has X-Real-IP",
+			request:  newRequest(privateAddr, publicAddr, ""),
+			expected: publicAddr,
+		}, {
+			name:     "Has X-Forwarded-For",
+			request:  newRequest(privateAddr, privateAddr, publicAddr),
+			expected: publicAddr,
+		}, {
+			name:     "Has multiple X-Forwarded-For",
+			request:  newRequest(privateAddr, privateAddr, multiAddresses),
+			expected: publicAddr,
+		}, {
+			name:     "Has all private IP",
+			request:  newRequest(privateAddr, privateAddr, privateAddr),
+			expected: "",
+		}, {
+			name:     "Has no IP at all",
+			request:  newRequest("--", ":", ":"),
+			expected: "",
+		},
+	}
+
+	// Run test
+	for _, v := range testData {
+		if actual, source := ClientIPFromRequest(v.request); v.expected != actual {
+			t.Errorf("Case:%s, expected:[%s], actual:[%s] from source:%s", v.name, v.expected, actual, source)
+			break
+		}
+	}
+}

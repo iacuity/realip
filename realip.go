@@ -49,6 +49,51 @@ func isPrivateAddress(address string) (bool, error) {
 	return false, nil
 }
 
+func getIPfromHostPort(hostPort string) string {
+	var err error
+	remoteIP := hostPort
+	// If there are colon in remote address, remove the port number
+	// otherwise, return remote address as is
+	if strings.ContainsRune(hostPort, ':') {
+		remoteIP, _, err = net.SplitHostPort(hostPort)
+		if err != nil {
+			remoteIP = ""
+		}
+	}
+	remoteIP = strings.TrimSpace(remoteIP)
+	return remoteIP
+}
+
+// ClientIPFromRequest return client's real public IP address from http request headers.
+func ClientIPFromRequest(r *http.Request) (ip string, source string) {
+	//Try from r.RemoteAddr
+	clientIP := getIPfromHostPort(r.RemoteAddr)
+	if isPrivate, _ := isPrivateAddress(clientIP); !isPrivate {
+		return clientIP, "remoteAddr"
+	}
+
+	//Try from X-Real-Ip
+	clientIP = getIPfromHostPort(r.Header.Get("X-Real-Ip"))
+	if isPrivate, _ := isPrivateAddress(clientIP); !isPrivate {
+		return clientIP, "X-Real-Ip"
+	}
+
+	// Check list of IP in X-Forwarded-For and return the first global address
+	xForwardedFor := r.Header.Get("X-Forwarded-For")
+	for _, address := range strings.Split(xForwardedFor, ",") {
+		clientIP = getIPfromHostPort(address)
+		if isPrivate, _ := isPrivateAddress(clientIP); !isPrivate {
+			return clientIP, "X-Forwarded-For"
+		}
+	}
+
+	//TODO:
+	//Check other headers
+
+	//Final
+	return "", ""
+}
+
 // FromRequest return client's real public IP address from http request headers.
 func FromRequest(r *http.Request) string {
 	// Fetch header value
