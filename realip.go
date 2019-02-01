@@ -64,33 +64,47 @@ func getIPfromHostPort(hostPort string) string {
 	return remoteIP
 }
 
+func isValidPublicIP(ip string) bool {
+	isPrivate, err := isPrivateAddress(ip)
+	return (err == nil && !isPrivate)
+}
+
 // ClientIPFromRequest return client's real public IP address from http request headers.
 func ClientIPFromRequest(r *http.Request) (ip string, source string) {
-	//Try from r.RemoteAddr
-	clientIP := getIPfromHostPort(r.RemoteAddr)
-	if isPrivate, _ := isPrivateAddress(clientIP); !isPrivate {
-		return clientIP, "remoteAddr"
-	}
+	clientIP := ""
 
-	//Try from X-Real-Ip
-	clientIP = getIPfromHostPort(r.Header.Get("X-Real-Ip"))
-	if isPrivate, _ := isPrivateAddress(clientIP); !isPrivate {
-		return clientIP, "X-Real-Ip"
-	}
+	//TODO:
+	//Check Standard headers
+	//Forwarded: for=192.0.2.60:1234;proto=http;by=203.0.113.43
 
-	// Check list of IP in X-Forwarded-For and return the first global address
+	//Try from X-Forwarded-For and return the first global address
 	xForwardedFor := r.Header.Get("X-Forwarded-For")
 	for _, address := range strings.Split(xForwardedFor, ",") {
 		clientIP = getIPfromHostPort(address)
-		if isPrivate, _ := isPrivateAddress(clientIP); !isPrivate {
+		if isValidPublicIP(clientIP) {
 			return clientIP, "X-Forwarded-For"
 		}
 	}
 
-	//TODO:
-	//Check other headers
+	//Try from X-Real-Ip
+	clientIP = getIPfromHostPort(r.Header.Get("X-Real-Ip"))
+	if isValidPublicIP(clientIP) {
+		return clientIP, "X-Real-Ip"
+	}
+
+	//Try from X-Client-IP
+	clientIP = getIPfromHostPort(r.Header.Get("X-Client-Ip"))
+	if isValidPublicIP(clientIP) {
+		return clientIP, "X-Client-Ip"
+	}
 
 	//Final
+	//Try from r.RemoteAddr
+	clientIP = getIPfromHostPort(r.RemoteAddr)
+	if isValidPublicIP(clientIP) {
+		return clientIP, "remoteAddr"
+	}
+
 	return "", ""
 }
 

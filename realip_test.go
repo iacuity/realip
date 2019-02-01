@@ -116,7 +116,8 @@ func TestClientIPFromRequest(t *testing.T) {
 	// Create test data
 	privateAddr := "127.0.0.1:1234"
 	publicAddr := "144.12.54.87"
-	multiAddresses := " 127.0.0.1 , 144.12.54.87:1234 , 119.14.55.11:1234 ,"
+	multiAddresses := " 127.0.0.1 , 115.98.247.136, 144.12.54.87:1234 , 119.14.55.11:1234 ,"
+	multi_publicAddr := "115.98.247.136"
 
 	testData := []testIP{
 		{
@@ -134,7 +135,7 @@ func TestClientIPFromRequest(t *testing.T) {
 		}, {
 			name:     "Has multiple X-Forwarded-For",
 			request:  newRequest(privateAddr, privateAddr, multiAddresses),
-			expected: publicAddr,
+			expected: multi_publicAddr,
 		}, {
 			name:     "Has all private IP",
 			request:  newRequest(privateAddr, privateAddr, privateAddr),
